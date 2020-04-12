@@ -6,6 +6,7 @@
 #include <stack>
 #include <unistd.h>
 #include <fcntl.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -19,7 +20,6 @@ unordered_map<int, int> hash_id; //hash map
 int decode_id[MAX_POINT_NUM];
 const char filename_input[100] = "/data/test_data.txt";
 const char filename_output[100] = "/projects/student/result.txt";
-//const char filename_check[100] = "data/std/result.txt";
 
 void read_data() {
     string buf;
@@ -149,7 +149,7 @@ void sort_ans() {
 }
 
 void print_ans() {
-    int fd = open(filename_output, O_RDWR | O_CREAT, 0666);
+    int fd = open(filename_output, O_CREAT, 0666);
     close(fd);
     freopen(filename_output,"w",stdout);
 
@@ -167,38 +167,6 @@ void print_ans() {
     fclose(stdout);
 }
 
-//vector<vector<int>> standard_ans;
-//void check_ans() {
-//    freopen(filename_check, "r", stdin);
-//    string buf;
-//    getline(cin, buf);
-//    while (getline(cin, buf)){
-//        string::size_type sz = -1;
-//        string tmp = buf;
-//        vector<int> tmp_v;
-//        while(tmp.size() > 0 && tmp[sz] ==',') {
-//            tmp = tmp.substr(sz+1);
-//            if(tmp.size() == 0)
-//                break;
-//            tmp_v.push_back(stoi(tmp, &sz));
-//        }
-//        standard_ans.push_back(tmp_v);
-//    }
-//
-//    int tot_ans = ans.size();
-//    for(int i=0;i<tot_ans;++i) {
-//        int len = ans[i].size();
-//        for(int j=0;j<len;++j) {
-//            if(ans[i][j] != standard_ans[i][j]) {
-//                cout << "wa" << endl;
-//                return;
-//            }
-//        }
-//    }
-//
-//    cout << "ac" << endl;
-//}
-
 int main() {
 
     read_data();
@@ -215,7 +183,6 @@ int main() {
     }
     sort_ans();
     print_ans();
-//    check_ans();
 
     return 0;
 }
