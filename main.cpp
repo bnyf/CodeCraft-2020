@@ -4,21 +4,26 @@
 #include <cstring>
 #include <vector>
 #include <stack>
+#include <unistd.h>
+#include <fcntl.h>
+
 using namespace std;
 
-//#define MAX_LINE_LEN 40 //单个数字长度
 #define MAX_EDGE_NUM 300000 //最大转账数
 #define MAX_POINT_NUM MAX_EDGE_NUM << 1
+#define my_debug(s) cout << s << endl
 int edge[MAX_EDGE_NUM][3];
 int tot_edge_num = 0;
 int tot_point_num = 0;
-
 unordered_map<int, int> hash_id; //hash map
 int decode_id[MAX_POINT_NUM];
+const char filename_input[100] = "/data/test_data.txt";
+const char filename_output[100] = "/projects/student/result.txt";
+//const char filename_check[100] = "data/std/result.txt";
 
 void read_data() {
     string buf;
-    freopen("test_data.txt", "r", stdin);
+    freopen(filename_input, "r", stdin);
     while (getline(cin, buf)){
         string::size_type sz = -1;
         string temp = buf;
@@ -74,10 +79,11 @@ void make_map() {
 
 int vis_g[MAX_POINT_NUM];
 int vis[MAX_POINT_NUM];
+
 vector< vector<int> > ans;
 stack<int> path;
-int dfs(int u, int target) {
-//    cout << "dfs: " << u <<  ' ' << target << ' ' << tot_point_num << endl;
+void dfs(int u, int target) {
+//    cout << u << ' ' << target << endl;
     vis[u] = 1;
     path.push(u);
     for(int i=head[u]; i != -1; i=m[i].next){
@@ -94,11 +100,6 @@ int dfs(int u, int target) {
                 }
                 ans.push_back(temp_v);
 
-//                for(int j=0;j<temp_v.size();++j) {
-//                    cout << temp_v[j] << ' ';
-//                }
-//                cout << endl;
-
             }
         }
         else if(path.size() < 7) {
@@ -109,9 +110,21 @@ int dfs(int u, int target) {
     vis[u] = 0;
 }
 
-void print_ans() {
+bool cmp(const vector<int> &a, vector<int> &b) {
+    int len1 = a.size();
+    int len2 = b.size();
+    if(len1 == len2) {
+        for(int i=0;i<len1;++i) {
+            if(a[i] != b[i])
+                return a[i] < b[i];
+        }
+    }
+
+    return len1 < len2;
+}
+
+void sort_ans() {
     int tot_ans = ans.size();
-    cout << tot_ans << endl;
     for(int i=0;i<tot_ans;++i) {
         int len = ans[i].size();
         ans[i][0] = decode_id[ans[i][0]];
@@ -124,34 +137,85 @@ void print_ans() {
                 pos = j;
             }
         }
-        cout << ans[i][pos];
+
+        vector<int> tmp;
+        tmp.push_back(ans[i][pos]);
         for(int j=(pos-1+len)%len;j!=pos;j=(j-1+len)%len) {
+            tmp.push_back(ans[i][j]);
+        }
+        ans[i] = tmp;
+    }
+    sort(ans.begin(), ans.end(), cmp);
+}
+
+void print_ans() {
+    int fd = open(filename_output, O_RDWR | O_CREAT, 0666);
+    close(fd);
+    freopen(filename_output,"w",stdout);
+
+    int tot_ans = ans.size();
+    cout << tot_ans << endl;
+    for(int i=0;i<tot_ans;++i) {
+        int len = ans[i].size();
+        cout << ans[i][0];
+        for(int j=1;j<len;++j) {
             cout << ',' << ans[i][j];
         }
         cout << endl;
     }
+
+    fclose(stdout);
 }
+
+//vector<vector<int>> standard_ans;
+//void check_ans() {
+//    freopen(filename_check, "r", stdin);
+//    string buf;
+//    getline(cin, buf);
+//    while (getline(cin, buf)){
+//        string::size_type sz = -1;
+//        string tmp = buf;
+//        vector<int> tmp_v;
+//        while(tmp.size() > 0 && tmp[sz] ==',') {
+//            tmp = tmp.substr(sz+1);
+//            if(tmp.size() == 0)
+//                break;
+//            tmp_v.push_back(stoi(tmp, &sz));
+//        }
+//        standard_ans.push_back(tmp_v);
+//    }
+//
+//    int tot_ans = ans.size();
+//    for(int i=0;i<tot_ans;++i) {
+//        int len = ans[i].size();
+//        for(int j=0;j<len;++j) {
+//            if(ans[i][j] != standard_ans[i][j]) {
+//                cout << "wa" << endl;
+//                return;
+//            }
+//        }
+//    }
+//
+//    cout << "ac" << endl;
+//}
 
 int main() {
 
-    cout << "begin read data" << endl;
     read_data();
-    cout << "begin hash id" << endl;
     hash_id_f();
-    cout << "begin make map" << endl;
     make_map();
-    cout << "begin dfs" << endl;
     for(int i=0;i<tot_point_num;++i) {
         if(d[i] == 0)
             continue;
         dfs(i, i);
         vis_g[i] = 1;
-        for(int i=head[i]; i != -1; i=m[i].next) {
-            d[m[i].to]--;
+        for(int j=head[i]; j != -1; j=m[j].next) {
+            d[m[j].to]--;
         }
     }
-    cout << "print ans" << endl;
+    sort_ans();
     print_ans();
+//    check_ans();
 
     return 0;
 }
