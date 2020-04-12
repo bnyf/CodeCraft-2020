@@ -149,8 +149,6 @@ void sort_ans() {
 }
 
 void print_ans() {
-    int fd = open(filename_output, O_CREAT, 0666);
-    close(fd);
     freopen(filename_output,"w",stdout);
 
     int tot_ans = ans.size();
