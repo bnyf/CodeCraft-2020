@@ -1,0 +1,3 @@
+/Users/bnyf/Documents/CLionProjects/CodeCraft-2020/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/bnyf/Documents/CLionProjects/CodeCraft-2020/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/bnyf/Documents/CLionProjects/CodeCraft-2020/cmake-build-debug/CMakeFiles/CodeCraft_2020.dir
