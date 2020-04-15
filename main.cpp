@@ -10,7 +10,7 @@ using namespace std;
 
 #define MAX_EDGE_NUM 300000 //最大转账数
 #define MAX_POINT_NUM 600000
-#define debug
+//#define debug
 
 void read_data();
 void hash_id_f();
@@ -310,7 +310,6 @@ void print_ans() {
 
     int tot_ans = ans.size();
     fprintf(file,"%d\n",tot_ans);
-    cout << tot_ans << endl;
     for(int i=0;i<tot_ans;++i) {
         int len = ans[i].size();
         fprintf(file,"%d",ans[i][0]);
