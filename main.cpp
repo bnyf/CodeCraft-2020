@@ -6,16 +6,24 @@
 #include <algorithm>
 #include <set>
 #include <ctime>
+#include <pthread.h>
 using namespace std;
 
 #define MAX_EDGE_NUM 300000 //最大转账数
 #define MAX_POINT_NUM 600000
-//#define debug
+#define THREAD_NUM 2 //线程数目
+#define debug
 
 void read_data();
 void hash_id_f();
 void sort_ans();
 void print_ans();
+void * thread_run(void *arg);
+
+struct range{
+    int start;//起始节点
+    int end;//最后一个节点
+};
 
 typedef struct MAP_s {
     int next; //下一条边
@@ -192,28 +200,27 @@ int main() {
     cout << tot_point_num <<endl<<endl;
 #endif
 
-    for(int i=0;i<tot_point_num;++i) {
-        tot_d_t[i].point_id = i;
-        tot_d_t[i].d = in_d[i] + out_d[i];
+    // 多线程主要处理过程
+pthread_t tid[THREAD_NUM];
+struct range arg[THREAD_NUM];
+int threadSize=tot_point_num/THREAD_NUM;
+for(int i=0;i<THREAD_NUM;i++)
+{
+    //分配任务
+    if(i<THREAD_NUM-1)
+    {
+        arg[i].start=threadSize*i;
+        arg[i].end=threadSize*(i+1);
+    }else{
+        arg[i].start=threadSize*i;
+        arg[i].end=tot_point_num;
     }
-    sort(tot_d_t, tot_d_t+tot_point_num);
-
-    for(int i=0;i<tot_point_num;++i) {
-        int point_id = tot_d_t[i].point_id;
-#ifdef debug
-        if(i % 100 == 0)
-            cout << i << endl;
-#endif
-        if(in_d[point_id] == 0)
-            continue;
-        forward_dfs(point_id, point_id, 1, 4); //找出长度为 3,4的环并记录长度为 5 的非环路径
-        backward_dfs(point_id, 1, 3); //反向记录长度为 2, 3, 4的非环路径
-        merge_path();
-        vis_g[point_id] = true;
-        for(int j=head[point_id]; j != -1; j=m[j].next) {
-            in_d[m[j].to]--;
-        }
-    }
+    pthread_create(&tid[i], NULL, thread_run, (void*)&arg[i]);
+}
+for(int i=0;i<THREAD_NUM;i++)
+{
+   pthread_join(tid[i], NULL);
+}
 
 #ifdef debug
     clock_t d_t = clock();
@@ -236,6 +243,39 @@ int main() {
 #endif
 
     return 0;
+}
+
+//线程处理函数
+void * thread_run(void *arg)
+{
+    struct range *temp;
+    temp=(struct range *)arg;
+
+    for(int i=temp->start;i<temp->end;++i) {
+        tot_d_t[i].point_id = i;
+        tot_d_t[i].d = in_d[i] + out_d[i];
+    }
+    /** 该排序作用是什么，是否拆分*/
+    sort(tot_d_t, tot_d_t+tot_point_num);
+
+    for(int i=temp->start;i<temp->end;++i) {
+        int point_id = tot_d_t[i].point_id;
+#ifdef debug
+        if((i-temp->start) % 100 == 0)
+            cout << i << endl;
+#endif
+        if(in_d[point_id] == 0)
+            continue;
+        forward_dfs(point_id, point_id, 1, 4); //找出长度为 3,4的环并记录长度为 5 的非环路径
+        backward_dfs(point_id, 1, 3); //反向记录长度为 2, 3, 4的非环路径
+        merge_path();
+        vis_g[point_id] = true;
+        for(int j=head[point_id]; j != -1; j=m[j].next) {
+            in_d[m[j].to]--;
+        }
+    }
+
+    pthread_exit(NULL);
 }
 
 void read_data() {

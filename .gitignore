@@ -1,6 +1,7 @@
 .idea
 .DS_*
 .vscode
+main
 test
 *.backups
 my_result.txt
