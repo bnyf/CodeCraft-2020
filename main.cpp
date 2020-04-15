@@ -9,8 +9,8 @@
 using namespace std;
 
 #define MAX_EDGE_NUM 300000 //最大转账数
-#define MAX_POINT_NUM 600000
-//#define debug
+#define MAX_POINT_NUM 300000
+#define debug
 
 void read_data();
 void hash_id_f();
@@ -23,8 +23,8 @@ typedef struct MAP_s {
 }MAP_t;
 
 #ifdef debug
-const char filename_input[100] = "data/1004812/test_data.txt";
-const char filename_output[100] = "data/1004812/my_result.txt";
+const char filename_input[100] = "data/3512444/test_data.txt";
+const char filename_output[100] = "data/3512444/my_result.txt";
 #else
 const char filename_input[100] = "/data/test_data.txt";
 const char filename_output[100] = "/projects/student/result.txt";
@@ -37,16 +37,6 @@ int tot_edge_num = 0;
 int tot_point_num = 0;
 
 int in_d[MAX_POINT_NUM];
-struct tot_d_s{
-    int d;
-    int point_id;
-
-    bool operator <(const struct tot_d_s &x) const{
-        return d > x.d;
-    }
-};
-struct tot_d_s tot_d_t[MAX_POINT_NUM];
-int out_d[MAX_POINT_NUM];
 
 int cnt = 0;
 
@@ -65,7 +55,6 @@ void make_edge(int u, int to, MAP_t *m_tmp, int *head_tmp) {
 void make_map() {
     memset(head,-1,sizeof(head));
     for(int i=0; i < tot_edge_num; i++) {
-        out_d[edge[i][0]]++;
         in_d[edge[i][1]]++;
         make_edge(edge[i][0], edge[i][1], m, head);
     }
@@ -82,28 +71,39 @@ bool vis[MAX_POINT_NUM];
 
 vector< vector<int> > ans;
 vector<int> path;
-unordered_map<int, vector< vector<int> > > forward_path; //正向深搜长度为5的序列，尾节点被去掉
-unordered_map<int, vector< vector<int> > > backward_path[3]; //反向深搜长度为2,3,4的序列，头结点被去掉
+unordered_map<int, vector< int > > backward_path; 
 
 void forward_dfs(int u, int target, int dep, int max_dep) {
     vis[u] = true;
     path.push_back(u);
+    if(dep == max_dep && backward_path.find(u) != backward_path.end()) {
+        int len = backward_path[u].size();
+        for(int j=0;j<len;++j){
+            int flag = true;
+            for(int k=1;k<dep-1;++k) {
+                if(path[k] == backward_path[u][j]) {
+                    flag = false;
+                    break;
+                }
+            }
+            if(flag) {
+                path.push_back(backward_path[u][j]);
+                ans.push_back(path);
+                path.pop_back();
+            }
+        }
+    }
     for(int i=head[u]; i != -1; i=m[i].next){
         int to = m[i].to;
         if(vis_g[to])
             continue;
         if(vis[to]) {
-            if(to == target && path.size() >= 3) {
+            if(to == target && dep >= 3) {
                 ans.push_back(path);
             }
         }
-        else {
-            if (dep < max_dep && out_d[to] > 0) {
-                forward_dfs(to, target, dep + 1, max_dep);
-            }
-            else {
-                forward_path[to].push_back(path);
-            }
+        else if (dep < max_dep) {
+            forward_dfs(to, target, dep + 1, max_dep);
         }
     }
     path.pop_back();
@@ -117,51 +117,15 @@ void backward_dfs(int u, int dep, int max_dep) {
         if(vis_g[to])
             continue;
         if(!vis[to])  {
-            path.push_back(to);
-            backward_path[max_dep-1][to].push_back(path);
-            if (dep < max_dep && out_d[to] > 0) {
+            if(dep == max_dep) {
+                backward_path[to].push_back(u);
+            }
+            if (dep < max_dep) {
                 backward_dfs(to, dep + 1, max_dep);
             }
-            path.pop_back();
         }
     }
     vis[u] = false;
-}
-set<int> charge_replica;
-void merge_path() {
-    for(auto iter : forward_path) { //遍历当前起点不同尾点长度为 5 的正向路径
-        int len_fwd_path = iter.second.size();
-        for(int cnt_fwd_path=0;cnt_fwd_path<len_fwd_path;++cnt_fwd_path) { //遍历指定起点尾点的正向长度为 5 的路径
-            for(auto & cnt_bwd : backward_path) { //backward_path长度分别为2,3,4的路径集合
-                if(cnt_bwd.find(iter.first) != cnt_bwd.end()) { //bwd 和 fwd 尾点相同
-                    int len_bwd_path = cnt_bwd[iter.first].size();
-                    int len_fwd_point = iter.second[cnt_fwd_path].size();
-                    for(int cnt_bwd_path=0;cnt_bwd_path<len_bwd_path;++cnt_bwd_path){ //遍历指定反向路径
-                        int len_bwd_point = cnt_bwd[iter.first][cnt_bwd_path].size();
-                        charge_replica.clear();
-                        for (int cnt_fwd_point = 1; cnt_fwd_point < len_fwd_point; ++cnt_fwd_point) { //遍历指定正向路径的元素（除头点）
-                            charge_replica.insert(iter.second[cnt_fwd_path][cnt_fwd_point]);
-                        }
-                        for (int cnt_bwd_point = 0; cnt_bwd_point < len_bwd_point-1; ++cnt_bwd_point) { //遍历指定反向路径的元素（除尾点）
-                            charge_replica.insert(cnt_bwd[iter.first][cnt_bwd_path][cnt_bwd_point]);
-                        }
-
-                        if(charge_replica.size() == len_fwd_point + len_bwd_point - 2) { //合并路径放入答案
-                            vector<int> tmp_path = iter.second[cnt_fwd_path]; //正向加入正向路径结点
-                            for (int cnt_bwd_point = len_bwd_point-1; cnt_bwd_point >= 0; --cnt_bwd_point) { //反向加入反向路径结点
-                                tmp_path.push_back(cnt_bwd[iter.first][cnt_bwd_path][cnt_bwd_point]);
-                            }
-                            ans.push_back(tmp_path);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    forward_path.clear();
-    for(auto & i : backward_path) {
-        i.clear();
-    }
 }
 
 int main() {
@@ -192,25 +156,19 @@ int main() {
     cout << tot_point_num <<endl<<endl;
 #endif
 
-    for(int i=0;i<tot_point_num;++i) {
-        tot_d_t[i].point_id = i;
-        tot_d_t[i].d = in_d[i] + out_d[i];
-    }
-    sort(tot_d_t, tot_d_t+tot_point_num);
 
     for(int i=0;i<tot_point_num;++i) {
-        int point_id = tot_d_t[i].point_id;
 #ifdef debug
         if(i % 100 == 0)
             cout << i << endl;
 #endif
-        if(in_d[point_id] == 0)
+        if(in_d[i] == 0)
             continue;
-        forward_dfs(point_id, point_id, 1, 4); //找出长度为 3,4的环并记录长度为 5 的非环路径
-        backward_dfs(point_id, 1, 3); //反向记录长度为 2, 3, 4的非环路径
-        merge_path();
-        vis_g[point_id] = true;
-        for(int j=head[point_id]; j != -1; j=m[j].next) {
+        backward_dfs(i, 1, 2);
+        forward_dfs(i, i, 1, 6);
+        backward_path.clear();
+        vis_g[i] = true;
+        for(int j=head[i]; j != -1; j=m[j].next) {
             in_d[m[j].to]--;
         }
     }
