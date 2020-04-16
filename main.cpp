@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <set>
 #include <ctime>
+#include <map>
+#include <queue>
 using namespace std;
 
 #define MAX_EDGE_NUM 300000 //最大转账数
@@ -13,8 +15,6 @@ using namespace std;
 #define debug
 
 void read_data();
-void hash_id_f();
-void sort_ans();
 void print_ans();
 
 typedef struct MAP_s {
@@ -23,15 +23,26 @@ typedef struct MAP_s {
 }MAP_t;
 
 #ifdef debug
-const char filename_input[100] = "data/3512444/test_data.txt";
-const char filename_output[100] = "data/3512444/my_result.txt";
+const char filename_input[100] = "data/1004812/test_data.txt";
+const char filename_output[100] = "data/1004812/my_result.txt";
 #else
 const char filename_input[100] = "/data/test_data.txt";
 const char filename_output[100] = "/projects/student/result.txt";
 #endif
 
-int edge[MAX_EDGE_NUM][2];
-unordered_map<int, int> hash_id; //id 的散列值
+struct EDGE {
+    int u;
+    int v;
+    bool operator <(const struct EDGE &x) const{
+        if(u != x.u)
+            return u > x.u;
+        else
+            return v > x.v;
+    }
+};
+struct EDGE edge[MAX_EDGE_NUM];
+
+map<int, int> hash_id; //id 的散列值
 int decode_id[MAX_POINT_NUM];
 int tot_edge_num = 0;
 int tot_point_num = 0;
@@ -55,18 +66,19 @@ void make_edge(int u, int to, MAP_t *m_tmp, int *head_tmp) {
 void make_map() {
     memset(head,-1,sizeof(head));
     for(int i=0; i < tot_edge_num; i++) {
-        in_d[edge[i][1]]++;
-        make_edge(edge[i][0], edge[i][1], m, head);
+        edge[i].u = hash_id[edge[i].u];
+        edge[i].v = hash_id[edge[i].v];
+        in_d[edge[i].v]++;
+        make_edge(edge[i].u, edge[i].v, m, head);
     }
 
     memset(head_bwd,-1,sizeof(head));
     cnt = 0;
     for(int i=0; i < tot_edge_num; i++) {
-        make_edge(edge[i][1], edge[i][0], m_bwd, head_bwd);
+        make_edge(edge[i].v, edge[i].u, m_bwd, head_bwd);
     }
 }
 
-bool vis_g[MAX_POINT_NUM];
 bool vis[MAX_POINT_NUM];
 
 vector< vector<int> > ans;
@@ -95,7 +107,7 @@ void forward_dfs(int u, int target, int dep, int max_dep) {
     }
     for(int i=head[u]; i != -1; i=m[i].next){
         int to = m[i].to;
-        if(vis_g[to])
+        if(to < target)
             continue;
         if(vis[to]) {
             if(to == target && dep >= 3) {
@@ -110,25 +122,62 @@ void forward_dfs(int u, int target, int dep, int max_dep) {
     vis[u] = false;
 }
 
-void backward_dfs(int u, int dep, int max_dep) {
+void backward_dfs(int u, int target, int dep, int max_dep) {
     vis[u] = true;
     for(int i=head_bwd[u]; i != -1; i=m_bwd[i].next) {
         int to = m_bwd[i].to;
-        if(vis_g[to])
+        if(to < target)
             continue;
         if(!vis[to])  {
             if(dep == max_dep) {
                 backward_path[to].push_back(u);
             }
             if (dep < max_dep) {
-                backward_dfs(to, dep + 1, max_dep);
+                backward_dfs(to, target, dep + 1, max_dep);
             }
         }
     }
     vis[u] = false;
 }
 
+bool cmp(const vector<int> &a, vector<int> &b) {
+    int len1 = a.size();
+    int len2 = b.size();
+    if(len1 == len2) {
+        for(int i=0;i<len1;++i) {
+            if(a[i] != b[i])
+                return a[i] < b[i];
+        }
+    }
+
+    return len1 < len2;
+}
+
+queue<int> q;
+
+void topo() {
+    for(int i=0;i<tot_point_num;++i) {
+        if(in_d[i] == 0) {
+            q.push(i);
+        }
+    }
+    while(!q.empty()) {
+        int cur = q.front();
+        q.pop();
+        for(int i=head[cur]; i != -1; i=m[i].next) {
+            int to = m[i].to;
+            in_d[to]--;
+            if(in_d[to] == 0) {
+                q.push(to);
+            }
+        }
+        head[cur] = -1;
+    }
+}
+
 int main() {
+
+    path.reserve(7);
 
 #ifdef debug
     clock_t s_t = clock();
@@ -141,35 +190,28 @@ int main() {
     cout << "read data time: " << (r_t - s_t)/CLOCKS_PER_SEC << endl;
 #endif
 
-    hash_id_f();
-
-#ifdef debug
-    clock_t h_t = clock();
-    cout << "hash id time: " << (h_t - r_t)/CLOCKS_PER_SEC << endl;
-#endif
-
     make_map();
 
 #ifdef debug
     clock_t m_t = clock();
-    cout << "make map time: " << (m_t - h_t)/CLOCKS_PER_SEC << endl;
-    cout << tot_point_num <<endl<<endl;
+    cout << "make map time: " << (m_t - r_t)/CLOCKS_PER_SEC << endl;
+    cout << tot_point_num << endl << endl;
 #endif
 
+    topo();
 
     for(int i=0;i<tot_point_num;++i) {
 #ifdef debug
-        if(i % 100 == 0)
+        if(i % 1000 == 0)
             cout << i << endl;
 #endif
-        if(in_d[i] == 0)
-            continue;
-        backward_dfs(i, 1, 2);
-        forward_dfs(i, i, 1, 6);
-        backward_path.clear();
-        vis_g[i] = true;
-        for(int j=head[i]; j != -1; j=m[j].next) {
-            in_d[m[j].to]--;
+        if(in_d[i] != 0) {
+            backward_dfs(i, i, 1, 2);
+            forward_dfs(i, i, 1, 6);
+            backward_path.clear();
+            for(int j=head[i]; j != -1; j=m[j].next) {
+                in_d[m[j].to]--;
+            }
         }
     }
 
@@ -178,7 +220,7 @@ int main() {
     cout << "dfs time: " << (d_t - m_t)/CLOCKS_PER_SEC << endl;
 #endif
 
-    sort_ans();
+    sort(ans.begin(), ans.end(), cmp);
 
 #ifdef debug
     clock_t sort_t = clock();
@@ -201,66 +243,17 @@ void read_data() {
     FILE* file=fopen(filename_input,"r");
     int u,v,c;
     while (fscanf(file,"%d,%d,%d",&u,&v,&c) != EOF){
-        edge[tot_edge_num][0] = u;
-        edge[tot_edge_num][1] = v;
+        edge[tot_edge_num].u = u;
+        edge[tot_edge_num].v = v;
+        hash_id[u] = 1;
+        hash_id[v] = 1;
         tot_edge_num++;
     }
     fclose(file);
-}
-
-//散列化id，因为最多 32w 条转账数据，所以可以将32位的id（10 位数） 映射到 32*2=64w 的空间内。
-void hash_id_f() {
-    for(int i=0; i < tot_edge_num; ++i) {
-        for(int j=0;j<2;++j) {
-            unordered_map<int,int>::const_iterator got = hash_id.find (edge[i][j]);
-            if(got == hash_id.end()) {
-                hash_id[edge[i][j]] = tot_point_num;
-                decode_id[tot_point_num] = edge[i][j];
-                edge[i][j] = tot_point_num++;
-            }
-            else {
-                edge[i][j] = hash_id[edge[i][j]];
-            }
-        }
+    for(auto &h: hash_id) {
+        h.second = tot_point_num;
+        decode_id[tot_point_num++] = h.second;
     }
-}
-
-bool cmp(const vector<int> &a, vector<int> &b) {
-    int len1 = a.size();
-    int len2 = b.size();
-    if(len1 == len2) {
-        for(int i=0;i<len1;++i) {
-            if(a[i] != b[i])
-                return a[i] < b[i];
-        }
-    }
-
-    return len1 < len2;
-}
-
-void sort_ans() {
-    int tot_ans = ans.size();
-    for(int i=0;i<tot_ans;++i) {
-        int len = ans[i].size();
-        ans[i][0] = decode_id[ans[i][0]];
-        int pos = 0;
-        int mn = ans[i][0];
-        for(int j=1;j<len;++j) {
-            ans[i][j] = decode_id[ans[i][j]];
-            if(ans[i][j] < mn) {
-                mn = ans[i][j];
-                pos = j;
-            }
-        }
-
-        vector<int> tmp;
-        tmp.push_back(ans[i][pos]);
-        for(int j=(pos+1)%len;j!=pos;j=(j+1)%len) {
-            tmp.push_back(ans[i][j]);
-        }
-        ans[i] = tmp;
-    }
-    sort(ans.begin(), ans.end(), cmp);
 }
 
 void print_ans() {
