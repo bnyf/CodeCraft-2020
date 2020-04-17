@@ -12,7 +12,7 @@ using namespace std;
 
 #define MAX_EDGE_NUM 300000 //最大转账数
 #define MAX_POINT_NUM 300000
-#define debug
+//#define debug
 
 void read_data();
 void print_ans();
@@ -23,11 +23,11 @@ typedef struct MAP_s {
 }MAP_t;
 
 #ifdef debug
-const char filename_input[100] = "data/1004812/test_data.txt";
-const char filename_output[100] = "data/1004812/my_result.txt";
+string input_file = "data/";
+string output_file = "data/";
 #else
-const char filename_input[100] = "/data/test_data.txt";
-const char filename_output[100] = "/projects/student/result.txt";
+string input_file = "/data/test_data.txt";
+string output_file = "/projects/student/result.txt";
 #endif
 
 struct EDGE {
@@ -48,6 +48,7 @@ int tot_edge_num = 0;
 int tot_point_num = 0;
 
 int in_d[MAX_POINT_NUM];
+int out_d[MAX_POINT_NUM];
 
 int cnt = 0;
 
@@ -69,6 +70,7 @@ void make_map() {
         edge[i].u = hash_id[edge[i].u];
         edge[i].v = hash_id[edge[i].v];
         in_d[edge[i].v]++;
+        out_d[edge[i].u]++;
         make_edge(edge[i].u, edge[i].v, m, head);
     }
 
@@ -107,7 +109,7 @@ void forward_dfs(int u, int target, int dep, int max_dep) {
     }
     for(int i=head[u]; i != -1; i=m[i].next){
         int to = m[i].to;
-        if(to < target)
+        if(to < target || out_d[to] == 0)
             continue;
         if(vis[to]) {
             if(to == target && dep >= 3) {
@@ -153,86 +155,81 @@ bool cmp(const vector<int> &a, vector<int> &b) {
     return len1 < len2;
 }
 
-queue<int> q;
-
+queue<int> q_in;
+queue<int> q_out;
 void topo() {
     for(int i=0;i<tot_point_num;++i) {
         if(in_d[i] == 0) {
-            q.push(i);
+            q_in.push(i);
+        }
+        if(out_d[i] == 0) {
+            q_out.push(i);
         }
     }
-    while(!q.empty()) {
-        int cur = q.front();
-        q.pop();
+    while(!q_in.empty()) {
+        int cur = q_in.front();
+        q_in.pop();
         for(int i=head[cur]; i != -1; i=m[i].next) {
             int to = m[i].to;
             in_d[to]--;
             if(in_d[to] == 0) {
-                q.push(to);
+                q_in.push(to);
             }
         }
         head[cur] = -1;
     }
-}
-
-int main() {
-
-    path.reserve(7);
-
-#ifdef debug
-    clock_t s_t = clock();
-#endif
-
-    read_data();
-
-#ifdef debug
-    clock_t r_t = clock();
-    cout << "read data time: " << (r_t - s_t)/CLOCKS_PER_SEC << endl;
-#endif
-
-    make_map();
-
-#ifdef debug
-    clock_t m_t = clock();
-    cout << "make map time: " << (m_t - r_t)/CLOCKS_PER_SEC << endl;
-    cout << tot_point_num << endl << endl;
-#endif
-
-    topo();
-
-    for(int i=0;i<tot_point_num;++i) {
-#ifdef debug
-        if(i % 1000 == 0)
-            cout << i << endl;
-#endif
-        if(in_d[i] != 0) {
-            backward_dfs(i, i, 1, 2);
-            forward_dfs(i, i, 1, 6);
-            backward_path.clear();
-            for(int j=head[i]; j != -1; j=m[j].next) {
-                in_d[m[j].to]--;
+    while(!q_out.empty()) {
+        int cur = q_out.front();
+        q_out.pop();
+        for(int i=head_bwd[cur]; i != -1; i=m_bwd[i].next) {
+            int to = m_bwd[i].to;
+            out_d[to]--;
+            if(out_d[to] == 0) {
+                q_out.push(to);
+                head[to] = -1;
             }
         }
     }
+}
+
+int main(int argc, char *argv[]) {
+    path.reserve(7);
+#ifdef debug
+    input_file += argv[1];
+    output_file += argv[1];
+    input_file +="/test_data.txt";
+    output_file += "/my_result.txt";
+    clock_t s_t = clock();
+#endif
+    read_data();
+    make_map();
+#ifdef debug
+    clock_t m_t = clock();
+    // cout << tot_point_num << endl;
+#endif
+    topo();
+
+
+    for(int i=0;i<tot_point_num;++i) {
+// #ifdef debug
+        // if(i % 1000 == 0)
+        //     cout << i << endl;
+// #endif
+        if(in_d[i] != 0 || out_d[i] == 0) {
+            backward_dfs(i, i, 1, 2);
+            forward_dfs(i, i, 1, 6);
+            backward_path.clear();
+        }
+    }
+
 
 #ifdef debug
     clock_t d_t = clock();
-    cout << "dfs time: " << (d_t - m_t)/CLOCKS_PER_SEC << endl;
 #endif
-
-    sort(ans.begin(), ans.end(), cmp);
-
-#ifdef debug
-    clock_t sort_t = clock();
-    cout << "sort time: " << (sort_t - d_t)/CLOCKS_PER_SEC << endl;
-#endif
-
     print_ans();
-
 #ifdef debug
     clock_t p_t = clock();
-    cout << "print time: " << (p_t - sort_t)/CLOCKS_PER_SEC << endl;
-    cout << "all time: " << (p_t - s_t)/CLOCKS_PER_SEC << endl;
+    cout << (d_t - m_t)/CLOCKS_PER_SEC << ' ' << (p_t - s_t)/CLOCKS_PER_SEC << endl;
 #endif
 
     return 0;
@@ -240,7 +237,7 @@ int main() {
 
 void read_data() {
     string buf;
-    FILE* file=fopen(filename_input,"r");
+    FILE* file=fopen(input_file.c_str(),"r");
     int u,v,c;
     while (fscanf(file,"%d,%d,%d",&u,&v,&c) != EOF){
         edge[tot_edge_num].u = u;
@@ -252,20 +249,21 @@ void read_data() {
     fclose(file);
     for(auto &h: hash_id) {
         h.second = tot_point_num;
-        decode_id[tot_point_num++] = h.second;
+        decode_id[tot_point_num++] = h.first;
     }
 }
 
 void print_ans() {
-    FILE* file=fopen(filename_output,"w");
+    sort(ans.begin(),ans.end(),cmp);
 
+    FILE* file=fopen(output_file.c_str(),"w");
     int tot_ans = ans.size();
     fprintf(file,"%d\n",tot_ans);
     for(int i=0;i<tot_ans;++i) {
         int len = ans[i].size();
-        fprintf(file,"%d",ans[i][0]);
+        fprintf(file,"%d",decode_id[ans[i][0]]);
         for(int j=1;j<len;++j) {
-            fprintf(file,",%d",ans[i][j]);
+            fprintf(file,",%d",decode_id[ans[i][j]]);
         }
         fprintf(file,"\n");
     }
