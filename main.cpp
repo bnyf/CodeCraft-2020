@@ -8,14 +8,21 @@
 #include <ctime>
 #include <map>
 #include <queue>
+#include <pthread.h>
 using namespace std;
 
 #define MAX_EDGE_NUM 300000 //最大转账数
 #define MAX_POINT_NUM 300000
-//#define debug
+#define THREAD_NUM 1 //线程数目
+#define debug
 
 void read_data();
 void print_ans();
+void * thread_run(void *arg);
+
+typedef struct myarg_t {
+    int id;
+}myarg_s;
 
 typedef struct MAP_s {
     int next; //下一条边
@@ -74,36 +81,36 @@ void make_map() {
         make_edge(edge[i].u, edge[i].v, m, head);
     }
 
-    memset(head_bwd,-1,sizeof(head));
+    memset(head_bwd,-1,sizeof(head_bwd));
     cnt = 0;
     for(int i=0; i < tot_edge_num; i++) {
         make_edge(edge[i].v, edge[i].u, m_bwd, head_bwd);
     }
 }
 
-bool vis[MAX_POINT_NUM];
+vector< vector<int> > final_ans;
+vector< vector<int> > thread_ans[THREAD_NUM];
+unordered_map<int, vector< int > > backward_path[THREAD_NUM];
+vector<int> path[THREAD_NUM];
+bool vis[THREAD_NUM][MAX_POINT_NUM];
 
-vector< vector<int> > ans;
-vector<int> path;
-unordered_map<int, vector< int > > backward_path; 
-
-void forward_dfs(int u, int target, int dep, int max_dep) {
-    vis[u] = true;
-    path.push_back(u);
-    if(dep == max_dep && backward_path.find(u) != backward_path.end()) {
-        int len = backward_path[u].size();
+void forward_dfs(int u, int target, int dep, int id) {
+    vis[id][u] = true;
+    path[id].push_back(u);
+    if(dep == 6 && backward_path[id].find(u) != backward_path[id].end()) {
+        int len = backward_path[id][u].size();
         for(int j=0;j<len;++j){
             int flag = true;
             for(int k=1;k<dep-1;++k) {
-                if(path[k] == backward_path[u][j]) {
+                if(path[id][k] == backward_path[id][u][j]) {
                     flag = false;
                     break;
                 }
             }
             if(flag) {
-                path.push_back(backward_path[u][j]);
-                ans.push_back(path);
-                path.pop_back();
+                path[id].push_back(backward_path[id][u][j]);
+                thread_ans[id].push_back(path[id]);
+                path[id].pop_back();
             }
         }
     }
@@ -111,35 +118,35 @@ void forward_dfs(int u, int target, int dep, int max_dep) {
         int to = m[i].to;
         if(to < target || out_d[to] == 0)
             continue;
-        if(vis[to]) {
+        if(vis[id][to]) {
             if(to == target && dep >= 3) {
-                ans.push_back(path);
+                thread_ans[id].push_back(path[id]);
             }
         }
-        else if (dep < max_dep) {
-            forward_dfs(to, target, dep + 1, max_dep);
+        else if (dep < 6) {
+            forward_dfs(to, target, dep + 1, id);
         }
     }
-    path.pop_back();
-    vis[u] = false;
+    path[id].pop_back();
+    vis[id][u] = false;
 }
 
-void backward_dfs(int u, int target, int dep, int max_dep) {
-    vis[u] = true;
+void backward_dfs(int u, int target, int dep, int id) {
+    vis[id][u] = true;
     for(int i=head_bwd[u]; i != -1; i=m_bwd[i].next) {
         int to = m_bwd[i].to;
-        if(to < target)
+        if(to < target || out_d[to] == 0)
             continue;
-        if(!vis[to])  {
-            if(dep == max_dep) {
-                backward_path[to].push_back(u);
+        if(!vis[id][to])  {
+            if(dep == 2) {
+                backward_path[id][to].push_back(u);
             }
-            if (dep < max_dep) {
-                backward_dfs(to, target, dep + 1, max_dep);
+            if (dep < 2) {
+                backward_dfs(to, target, dep + 1, id);
             }
         }
     }
-    vis[u] = false;
+    vis[id][u] = false;
 }
 
 bool cmp(const vector<int> &a, vector<int> &b) {
@@ -193,7 +200,6 @@ void topo() {
 }
 
 int main(int argc, char *argv[]) {
-    path.reserve(7);
 #ifdef debug
     input_file += argv[1];
     output_file += argv[1];
@@ -205,21 +211,18 @@ int main(int argc, char *argv[]) {
     make_map();
 #ifdef debug
     clock_t m_t = clock();
-    // cout << tot_point_num << endl;
 #endif
     topo();
 
-
-    for(int i=0;i<tot_point_num;++i) {
-// #ifdef debug
-        // if(i % 1000 == 0)
-        //     cout << i << endl;
-// #endif
-        if(in_d[i] != 0 || out_d[i] == 0) {
-            backward_dfs(i, i, 1, 2);
-            forward_dfs(i, i, 1, 6);
-            backward_path.clear();
-        }
+    myarg_s myarg[THREAD_NUM];
+    // 多线程主要处理过程
+    pthread_t tid[THREAD_NUM];
+    for(int i=0;i<THREAD_NUM;i++) {
+        myarg[i].id = i;
+        pthread_create(&tid[i], nullptr, thread_run, (void*)&myarg[i]);
+    }
+    for(auto & i : tid) {
+        pthread_join(i, nullptr);
     }
 
 
@@ -233,6 +236,24 @@ int main(int argc, char *argv[]) {
 #endif
 
     return 0;
+}
+
+//线程处理函数
+void * thread_run(void *arg)
+{
+    auto *myarg = (myarg_s*)arg;
+    int id = myarg->id;
+    path[id].reserve(7);
+
+    for(int i=id;i<tot_point_num;i+=THREAD_NUM) {
+        if(in_d[i] != 0 || out_d[i] == 0) {
+            backward_path[id].clear();
+            backward_dfs(i, i, 1, id);
+            forward_dfs(i, i, 1, id);
+        }
+    }
+
+    pthread_exit(nullptr);
 }
 
 void read_data() {
@@ -254,16 +275,21 @@ void read_data() {
 }
 
 void print_ans() {
-    sort(ans.begin(),ans.end(),cmp);
+    for(int i=0;i<THREAD_NUM;++i) {
+//        cout << tot_point_num << endl;
+//        cout << thread_ans[i].size() << endl;
+        final_ans.insert(final_ans.end(), thread_ans[i].begin(), thread_ans[i].end());
+    }
+    sort(final_ans.begin(),final_ans.end(),cmp);
 
     FILE* file=fopen(output_file.c_str(),"w");
-    int tot_ans = ans.size();
+    int tot_ans = final_ans.size();
     fprintf(file,"%d\n",tot_ans);
     for(int i=0;i<tot_ans;++i) {
-        int len = ans[i].size();
-        fprintf(file,"%d",decode_id[ans[i][0]]);
+        int len = final_ans[i].size();
+        fprintf(file,"%d",decode_id[final_ans[i][0]]);
         for(int j=1;j<len;++j) {
-            fprintf(file,",%d",decode_id[ans[i][j]]);
+            fprintf(file,",%d",decode_id[final_ans[i][j]]);
         }
         fprintf(file,"\n");
     }
