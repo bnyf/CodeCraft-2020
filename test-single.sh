@@ -1,4 +1,5 @@
 #! /bin/bash
+#usage: ./test-single.sh std
 
 workdir=`cd $(dirname $0); pwd`
 
